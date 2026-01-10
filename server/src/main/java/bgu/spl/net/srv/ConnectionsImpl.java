@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentMap;
 public class ConnectionsImpl<T> implements Connections<T>{
 
     private final ConcurrentMap<Integer, ConnectionHandler<T>> connectionsMap = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, Set<Integer>> channelSubscibers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Set<Integer>> channelSubscribers = new ConcurrentHashMap<>();
     private final ConcurrentMap<Integer, Set<String>> clientsSubscribedChannels = new ConcurrentHashMap<>();
 
     @Override
@@ -25,7 +25,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
 
     @Override
     public void send(String channel, T msg){
-        Set<Integer> channelSubs = channelSubscibers.get(channel);
+        Set<Integer> channelSubs = channelSubscribers.get(channel);
 
         if(channelSubs != null){
             for(Integer connectionId: channelSubs){
@@ -46,12 +46,12 @@ public class ConnectionsImpl<T> implements Connections<T>{
             }
         }
 
-        Set<String> connectionSubscribedChannels = clientsSubscribedChannels.get(connectionId);
+        Set<String> connectionSubscribedChannels = clientsSubscribedChannels.remove(connectionId);
         if(connectionSubscribedChannels != null){
             for(String channel: connectionSubscribedChannels){
-                Set<Integer> channelSubscribers = channelSubscibers.get(channel);
-                if(channelSubscribers != null){
-                    channelSubscribers.remove(connectionId);
+                Set<Integer> channelSubs = channelSubscribers.get(channel);
+                if(channelSubs != null){
+                    channelSubs.remove(connectionId);
                 }
             }
         }
@@ -74,7 +74,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param connectionId
      */
     public void subscribe(String channel, int connectionId){
-        channelSubscibers.computeIfAbsent(channel, k-> ConcurrentHashMap.newKeySet()).add(connectionId);
+        channelSubscribers.computeIfAbsent(channel, k-> ConcurrentHashMap.newKeySet()).add(connectionId);
         Set<String> userChannels =clientsSubscribedChannels.get(connectionId);
         if(userChannels != null){
             userChannels.add(channel);
@@ -87,7 +87,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param connectionId
      */
     public void unsubscribe(String channel, int connectionId){
-        Set<Integer> subs = channelSubscibers.get(channel);
+        Set<Integer> subs = channelSubscribers.get(channel);
         if(subs != null){
             subs.remove(connectionId);
         }
