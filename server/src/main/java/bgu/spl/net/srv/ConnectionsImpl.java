@@ -13,7 +13,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
 
     @Override
     public boolean send(int connectionId, T msg){
-        ConnectionHandler<T> connectionHandler = connectionsMap.get(connectionId);
+        ConnectionHandler<T> connectionHandler = this.connectionsMap.get(connectionId);
 
         if (connectionHandler == null) {
             return false; 
@@ -25,7 +25,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
 
     @Override
     public void send(String channel, T msg){
-        Set<Integer> channelSubs = channelSubscribers.get(channel);
+        Set<Integer> channelSubs = this.channelSubscribers.get(channel);
 
         if(channelSubs != null){
             for(Integer connectionId: channelSubs){
@@ -36,7 +36,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
 
     @Override
     public void disconnect(int connectionId){
-        ConnectionHandler<T> removedHandler = connectionsMap.remove(connectionId);
+        ConnectionHandler<T> removedHandler = this.connectionsMap.remove(connectionId);
         if(removedHandler != null){
             try{
                 removedHandler.close();
@@ -46,10 +46,10 @@ public class ConnectionsImpl<T> implements Connections<T>{
             }
         }
 
-        Set<String> connectionSubscribedChannels = clientsSubscribedChannels.remove(connectionId);
+        Set<String> connectionSubscribedChannels = this.clientsSubscribedChannels.remove(connectionId);
         if(connectionSubscribedChannels != null){
             for(String channel: connectionSubscribedChannels){
-                Set<Integer> channelSubs = channelSubscribers.get(channel);
+                Set<Integer> channelSubs = this.channelSubscribers.get(channel);
                 if(channelSubs != null){
                     channelSubs.remove(connectionId);
                 }
@@ -64,8 +64,8 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param handler
      */
     public void addConnection(int connectionId, ConnectionHandler<T> handler){
-        connectionsMap.put(connectionId, handler);
-        clientsSubscribedChannels.put(connectionId, ConcurrentHashMap.newKeySet());
+        this.connectionsMap.put(connectionId, handler);
+        this.clientsSubscribedChannels.put(connectionId, ConcurrentHashMap.newKeySet());
     }
 
     /**
@@ -75,7 +75,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      */
     public void subscribe(String channel, int connectionId){
         channelSubscribers.computeIfAbsent(channel, k-> ConcurrentHashMap.newKeySet()).add(connectionId);
-        Set<String> userChannels =clientsSubscribedChannels.get(connectionId);
+        Set<String> userChannels =this.clientsSubscribedChannels.get(connectionId);
         if(userChannels != null){
             userChannels.add(channel);
         }
@@ -87,12 +87,12 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param connectionId
      */
     public void unsubscribe(String channel, int connectionId){
-        Set<Integer> subs = channelSubscribers.get(channel);
+        Set<Integer> subs = this.channelSubscribers.get(channel);
         if(subs != null){
             subs.remove(connectionId);
         }
 
-        Set<String> clientChannels = clientsSubscribedChannels.get(connectionId);
+        Set<String> clientChannels = this.clientsSubscribedChannels.get(connectionId);
         if(clientChannels != null){
             clientChannels.remove(channel);
         }
@@ -105,7 +105,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @return
      */
     public boolean isUserSubscribed(int connectionId, String channel){
-        Set<String> userSubscriptions = clientsSubscribedChannels.get(connectionId);
+        Set<String> userSubscriptions = this.clientsSubscribedChannels.get(connectionId);
         return userSubscriptions!= null && userSubscriptions.contains(channel);
     }
 
