@@ -45,6 +45,20 @@ public enum StompClientCommand {
         }
         return null;
     }
+
+
+    /**
+     * For a given string, validates the STOMP command. If the command is not supported, returns UNKNOWN.
+     * @param commandString
+     * @return StompClientCommand
+     */
+    public static StompClientCommand validatedStompCommand(String commandString) {
+        try {
+            return StompClientCommand.valueOf(commandString);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return UNKNOWN;
+        }
+    }
 }
 
 // Client frames:

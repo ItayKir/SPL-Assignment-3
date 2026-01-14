@@ -1,5 +1,8 @@
 package bgu.spl.net.impl.stomp;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import bgu.spl.net.api.StompMessagingProtocol;
 import bgu.spl.net.srv.Connections;
 
@@ -19,14 +22,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     public void process(String message){
         StompFrameParser stompFrame = StompFrameParser.parse(message);
 
-        StompClientCommand clientCommand;
-        try{
-            clientCommand = StompClientCommand.valueOf(stompFrame.getCommand());
-        } catch (IllegalArgumentException e){
-            processError(stompFrame);
-            return;
-        }
-
+        StompClientCommand clientCommand = StompClientCommand.validatedStompCommand(stompFrame.getCommand());
         switch (clientCommand){
             case CONNECT:
                 processConnect(stompFrame);
@@ -42,6 +38,9 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
                 break;
             case DISCONNECT:
                 processDisconnect(stompFrame);
+                break;
+            case UNKNOWN:
+                processError(stompFrame, "Unknown STOMP command provided", "The command \"" + stompFrame.getCommand() + "\" is unknown. Please provide one of the following CONNECT, SEND, SUBSCRIBE, UNSUBSCRIBE, DISCONNECT." + "\n");
                 break;
         }
     }
@@ -70,8 +69,17 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         String receipt = stompFrame.getHeaderValue("receipt");
     }
 
-    private void processError(StompFrameParser stompFrame){
+    private void processError(StompFrameParser stompFrame, String errorHeader, String errorBody){
+        this.shouldTerminate = true;
 
+        Map<String,String> errorHeaders = new HashMap<String,String>();
+        errorHeaders.put("message", errorHeader);
+        String receipt_id = stompFrame.getHeaderValue("receipt");
+        if(receipt_id != null){
+            errorHeaders.put("receipt", receipt_id);
+        }
+
+        connections.send(connectionId, new StompFrameParser("ERROR", errorHeaders , errorBody).toString());
     }
 
     @Override

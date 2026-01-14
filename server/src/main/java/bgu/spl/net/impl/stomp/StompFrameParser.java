@@ -69,18 +69,6 @@ public class StompFrameParser {
         return stompHeaders.containsKey(header);
     }
 
-    // Need to think if this belongs here or not...
-    private StompFrameParser createErrorFrame(String errorMessage ,String errorBody){
-        Map<String,String> errorStompHeaders = new HashMap<String,String>();
-        errorStompHeaders.put("message", errorMessage);
-        String receipt_id = getHeaderValue("receipt");
-        if(receipt_id != null){
-            errorStompHeaders.put("receipt_id", receipt_id);
-        }
-
-        return new StompFrameParser("UNKNOWN", errorStompHeaders, errorBody);
-
-    }
 
 
     @Override
