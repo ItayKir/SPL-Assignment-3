@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentMap;
 
 public class ConnectionsImpl<T> implements Connections<T>{
 
+    //TODO: Need to check if this is enough to support subscribtion ID checking.
     private final ConcurrentMap<Integer, ConnectionHandler<T>> connectionsMap = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<Integer>> channelSubscribers = new ConcurrentHashMap<>();
     private final ConcurrentMap<Integer, Set<String>> clientsSubscribedChannels = new ConcurrentHashMap<>();
@@ -63,6 +64,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param connectionId
      * @param handler
      */
+    @Override
     public void addConnection(int connectionId, ConnectionHandler<T> handler){
         this.connectionsMap.put(connectionId, handler);
         this.clientsSubscribedChannels.put(connectionId, ConcurrentHashMap.newKeySet());
@@ -73,6 +75,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param channel
      * @param connectionId
      */
+    @Override
     public void subscribe(String channel, int connectionId){
         channelSubscribers.computeIfAbsent(channel, k-> ConcurrentHashMap.newKeySet()).add(connectionId);
         Set<String> userChannels =this.clientsSubscribedChannels.get(connectionId);
@@ -86,6 +89,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param channel
      * @param connectionId
      */
+    @Override
     public void unsubscribe(String channel, int connectionId){
         Set<Integer> subs = this.channelSubscribers.get(channel);
         if(subs != null){
@@ -104,6 +108,7 @@ public class ConnectionsImpl<T> implements Connections<T>{
      * @param channel
      * @return
      */
+    @Override
     public boolean isUserSubscribed(int connectionId, String channel){
         Set<String> userSubscriptions = this.clientsSubscribedChannels.get(connectionId);
         return userSubscriptions!= null && userSubscriptions.contains(channel);

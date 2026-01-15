@@ -25,4 +25,15 @@ public interface Connections<T> {
      * @param connectionId
      */
     void disconnect(int connectionId);
+
+    
+    //Helper Functions
+    void addConnection(int connectionId, ConnectionHandler<T> handler);
+
+    void subscribe(String channel, int connectionId);
+
+    void unsubscribe(String channel, int connectionId);
+
+    boolean isUserSubscribed(int connectionId, String channel);
+
 }

@@ -23,6 +23,9 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         StompFrameParser stompFrame = StompFrameParser.parse(message);
 
         StompClientCommand clientCommand = StompClientCommand.validatedStompCommand(stompFrame.getCommand());
+        if(!clientCommand.validate(stompFrame)){
+            processError(stompFrame, "Missing mandatory header","The following header is missing for the given command: " + clientCommand.getMissingHeader(stompFrame));
+        }
         switch (clientCommand){
             case CONNECT:
                 processConnect(stompFrame);
@@ -40,8 +43,8 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
                 processDisconnect(stompFrame);
                 break;
             case UNKNOWN:
-                processError(stompFrame, "Unknown STOMP command provided", "The command \"" + stompFrame.getCommand() + "\" is unknown. Please provide one of the following CONNECT, SEND, SUBSCRIBE, UNSUBSCRIBE, DISCONNECT." + "\n");
-                break;
+                processError(stompFrame, "Unknown STOMP command provided", "The command \"" + stompFrame.getCommand() + "\" is unknown. Please provide one of the following CONNECT, SEND, SUBSCRIBE, UNSUBSCRIBE, DISCONNECT.");
+                return;
         }
     }
 
@@ -54,6 +57,20 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
 
     private void processSend(StompFrameParser stompFrame){
         String destination = stompFrame.getHeaderValue("destination");
+        if(!connections.isUserSubscribed(connectionId, destination))
+            processError(stompFrame, "Not subscibed to topic", "Must be subscribed to the topic in order to send it a message!");
+        
+        String messageBody = stompFrame.getBody();
+        
+        if(messageBody== null || messageBody.isEmpty())
+            processError(stompFrame, "Empty message", "Can't send an empty message to the topic.");
+        
+        try{
+            connections.send(destination, messageBody);
+        }
+        catch(Exception e){
+            processError(stompFrame, "Failed SEND", "Server failed while sending");
+        }
     }
 	
     private void processSubscribe(StompFrameParser stompFrame){
@@ -69,6 +86,12 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         String receipt = stompFrame.getHeaderValue("receipt");
     }
 
+    /**
+     * Logic when an error occours - sets as should terminate true and send message to user with provided error details. Adds receipt if available.
+     * @param stompFrame - provided by the user
+     * @param errorHeader
+     * @param errorBody
+     */
     private void processError(StompFrameParser stompFrame, String errorHeader, String errorBody){
         this.shouldTerminate = true;
 
