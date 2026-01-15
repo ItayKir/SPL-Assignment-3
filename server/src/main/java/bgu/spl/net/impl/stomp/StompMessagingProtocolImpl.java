@@ -6,6 +6,9 @@ import java.util.Map;
 import bgu.spl.net.api.StompMessagingProtocol;
 import bgu.spl.net.srv.Connections;
 
+import bgu.spl.net.impl.data.Database;
+import bgu.spl.net.impl.data.LoginStatus;
+
 public class StompMessagingProtocolImpl implements StompMessagingProtocol<String>{
     
     private int connectionId;
@@ -53,7 +56,28 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         String accept_version = stompFrame.getHeaderValue("accept-version");
         String host = stompFrame.getHeaderValue("host");
         String passcode = stompFrame.getHeaderValue("passcode");
+
+        if(accept_version != null && accept_version !="1.2" ){
+            processError(stompFrame, "Incorrect STOMP version", "accept-version must be 1.2");
+            return;
+        }
         try{
+            LoginStatus loginStatus = Database.getInstance().login(connectionId, login, passcode);
+            switch(loginStatus){
+                case LOGGED_IN_SUCCESSFULLY:
+                case ADDED_NEW_USER:
+                    connections.send(connectionId, buildConnectMessage(accept_version));
+                    break;
+                case WRONG_PASSWORD:
+                    processError(stompFrame, "Login Failed", "Wrong password!");
+                case ALREADY_LOGGED_IN:
+                    processError(stompFrame, "Login Failed", "User already logged in!");
+                case CLIENT_ALREADY_CONNECTED:
+                    processError(stompFrame, "Login Failed", "This user is already connected from a differnt client!");
+                default:
+                    processError(stompFrame, "Login Failed", "Unknown error occoured.");
+            }
+
             this.connections.send(connectionId, buildConnectMessage(accept_version));
         }
         catch(Exception e){
@@ -110,8 +134,8 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
 
     /**
      * Builds a connect message
-     * @param receipt
-     * @return String representing disconnect message
+     * @param version
+     * @return String representing connect message
      */
     private String buildConnectMessage(String version){
         Map<String, String> msgHeaders = new HashMap<String,String>();
