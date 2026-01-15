@@ -53,6 +53,12 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         String accept_version = stompFrame.getHeaderValue("accept-version");
         String host = stompFrame.getHeaderValue("host");
         String passcode = stompFrame.getHeaderValue("passcode");
+        try{
+            this.connections.send(connectionId, buildConnectMessage(accept_version));
+        }
+        catch(Exception e){
+            processError(stompFrame, "Failed to connect", "The server failed to connect.");
+        }
     }
 
     private void processSend(StompFrameParser stompFrame){
@@ -91,10 +97,37 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         this.connections.disconnect(connectionId);
     }
 
+    /**
+     * Builds a disconnect message
+     * @param receipt
+     * @return String representing disconnect message
+     */
     private String buildDisconnectMessage(String receipt){
         Map<String, String> msgHeaders = new HashMap<String,String>();
         msgHeaders.put("receipt-id",receipt);
-        return new StompFrameParser("RECEIPT", msgHeaders, null).toString();
+        return buildResponseMessage("RECEIPT", msgHeaders, null);
+    }
+
+    /**
+     * Builds a connect message
+     * @param receipt
+     * @return String representing disconnect message
+     */
+    private String buildConnectMessage(String version){
+        Map<String, String> msgHeaders = new HashMap<String,String>();
+        msgHeaders.put("version",version);
+        return buildResponseMessage("CONNECTED", msgHeaders, null);
+    }
+
+    /**
+     * Builds a general message based on input.
+     * @param msgCommand
+     * @param msgHeaders
+     * @param msgBody
+     * @return String representing a general message to send
+     */
+    private String buildResponseMessage(String msgCommand, Map<String, String> msgHeaders, String msgBody){
+        return new StompFrameParser(msgCommand, msgHeaders, null).toString();
     }
 
     /**
@@ -113,7 +146,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             errorHeaders.put("receipt", receipt_id);
         }
 
-        this.connections.send(this.connectionId, new StompFrameParser("ERROR", errorHeaders , errorBody).toString());
+        this.connections.send(this.connectionId, buildResponseMessage("ERROR", errorHeaders , errorBody));
     }
 
     @Override
