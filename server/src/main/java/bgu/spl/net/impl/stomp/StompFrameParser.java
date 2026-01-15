@@ -41,13 +41,14 @@ public class StompFrameParser {
             i++;
         }
 
+        i++;
+
         String stompBody ="";
         while(i < msgLines.length){
             stompBody += msgLines[i] + "\n";
         }
-        stompBody = stompBody.trim(); // I added back the new lines but for the last row I need to remove what I added (new lines only between exisiting lines)
 
-        return new StompFrameParser(rawCommand, rawHeaders, rawMessage);
+        return new StompFrameParser(rawCommand, rawHeaders, stompBody);
 
     }
 
@@ -66,7 +67,7 @@ public class StompFrameParser {
     public String toString(){
         String out="";
 
-        out += getCommand();
+        out += getCommand() + "\n";
         for(Map.Entry<String, String> header: stompHeaders.entrySet()){
             out += header.getKey() + ":" + header.getValue() + "\n" ;
         }

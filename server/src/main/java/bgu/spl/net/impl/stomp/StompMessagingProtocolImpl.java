@@ -2,6 +2,7 @@ package bgu.spl.net.impl.stomp;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import bgu.spl.net.api.StompMessagingProtocol;
 import bgu.spl.net.srv.Connections;
@@ -14,6 +15,8 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     private int connectionId;
     Connections<String> connections;
     private boolean shouldTerminate = false;
+
+    private AtomicLong messageCounter = new AtomicLong(0); 
 
 	@Override
     public void start(int connectionId, Connections<String> connections){
@@ -66,19 +69,20 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             switch(loginStatus){
                 case LOGGED_IN_SUCCESSFULLY:
                 case ADDED_NEW_USER:
-                    connections.send(connectionId, buildConnectMessage(accept_version));
+                    connections.send(connectionId, buildConnectMessage(stompFrame, accept_version));
                     break;
                 case WRONG_PASSWORD:
                     processError(stompFrame, "Login Failed", "Wrong password!");
+                    break;
                 case ALREADY_LOGGED_IN:
                     processError(stompFrame, "Login Failed", "User already logged in!");
+                    break;
                 case CLIENT_ALREADY_CONNECTED:
                     processError(stompFrame, "Login Failed", "This user is already connected from a differnt client!");
+                    break;
                 default:
                     processError(stompFrame, "Login Failed", "Unknown error occoured.");
             }
-
-            this.connections.send(connectionId, buildConnectMessage(accept_version));
         }
         catch(Exception e){
             processError(stompFrame, "Failed to connect", "The server failed to connect.");
@@ -96,7 +100,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             processError(stompFrame, "Empty message", "Can't send an empty message to the topic.");
         
         try{
-            this.connections.send(destination, messageBody);
+            this.connections.send(destination, buildServerMessage(destination, String.valueOf(this.messageCounter.addAndGet(1))));
         }
         catch(Exception e){
             processError(stompFrame, "Failed SEND", "Server failed while sending");
@@ -117,7 +121,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
 
     private void processDisconnect(StompFrameParser stompFrame){
         String receipt = stompFrame.getHeaderValue("receipt");
-        this.connections.send(this.connectionId, buildDisconnectMessage(receipt));
+        this.connections.send(this.connectionId, buildDisconnectMessage(stompFrame, receipt));
         this.connections.disconnect(connectionId);
     }
 
@@ -126,22 +130,41 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
      * @param receipt
      * @return String representing disconnect message
      */
-    private String buildDisconnectMessage(String receipt){
+    private String buildDisconnectMessage(StompFrameParser stompFrame,String receipt){
         Map<String, String> msgHeaders = new HashMap<String,String>();
-        msgHeaders.put("receipt-id",receipt);
+        addReceiptIfExist(stompFrame, msgHeaders);
         return buildResponseMessage("RECEIPT", msgHeaders, null);
     }
 
     /**
      * Builds a connect message
+     * @param stompFrame
      * @param version
      * @return String representing connect message
      */
-    private String buildConnectMessage(String version){
+    private String buildConnectMessage(StompFrameParser stompFrame,String version){
         Map<String, String> msgHeaders = new HashMap<String,String>();
         msgHeaders.put("version",version);
+        addReceiptIfExist(stompFrame, msgHeaders);
         return buildResponseMessage("CONNECTED", msgHeaders, null);
     }
+
+    /**
+     * Builds a server message (MESSAGE).
+     * @param destination
+     * @param message_id
+     * @param subscriptionId
+     * @return String represeting MESSAGE
+     * @implNote subscription ID is added by Connections (addSubIdToMessage)
+     */
+    private String buildServerMessage(String destination, String message_id){
+        Map<String, String> msgHeaders = new HashMap<String,String>();
+        msgHeaders.put("destination",destination);
+        msgHeaders.put("message-id",message_id);
+
+        return buildResponseMessage("MESSAGE", msgHeaders, null);
+    }
+
 
     /**
      * Builds a general message based on input.
@@ -165,12 +188,20 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
 
         Map<String,String> errorHeaders = new HashMap<String,String>();
         errorHeaders.put("message", errorHeader);
-        String receipt_id = stompFrame.getHeaderValue("receipt");
-        if(receipt_id != null){
-            errorHeaders.put("receipt", receipt_id);
-        }
+        addReceiptIfExist(stompFrame, errorHeaders);
 
         this.connections.send(this.connectionId, buildResponseMessage("ERROR", errorHeaders , errorBody));
+    }
+
+    /**
+     * Check if receipt exists in client frame - if yes, adds it to the given map (which will be sent back to the user)
+     * @param stompFrame
+     * @param responseHeaders
+     */
+    private void addReceiptIfExist(StompFrameParser stompFrame, Map<String,String> responseHeaders){
+        if(stompFrame != null && stompFrame.hasHeader("receipt")){
+            responseHeaders.put("receipt", stompFrame.getHeaderValue("receipt"));
+        }
     }
 
     @Override

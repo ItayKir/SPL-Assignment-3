@@ -21,7 +21,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
     @Override
     public boolean send(int connectionId, T msg) {
-        ConnectionHandler<T> handler = connectionsMap.get(connectionId);
+        ConnectionHandler<T> handler = this.connectionsMap.get(connectionId);
         if (handler == null) {
             return false;
         }
@@ -36,7 +36,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
         
         if (subscribers != null) {
             for (Integer connId : subscribers) {
-                ConcurrentMap<String, String> channelToSub = clientChannelToSubscriptionId.get(connId);
+                ConcurrentMap<String, String> channelToSub = this.clientChannelToSubscriptionId.get(connId);
                 
                 if (channelToSub != null) {
                     String subscriptionId = channelToSub.get(channel);
@@ -56,7 +56,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
     @Override
     public void disconnect(int connectionId) {
-        ConnectionHandler<T> handler = connectionsMap.remove(connectionId);
+        ConnectionHandler<T> handler = this.connectionsMap.remove(connectionId);
         if (handler != null) {
             try {
                 handler.close();
@@ -65,10 +65,10 @@ public class ConnectionsImpl<T> implements Connections<T> {
             }
         }
 
-        ConcurrentMap<String, String> userChannels = clientChannelToSubscriptionId.remove(connectionId);
+        ConcurrentMap<String, String> userChannels = this.clientChannelToSubscriptionId.remove(connectionId);
         if (userChannels != null) {
             for (String channel : userChannels.keySet()) {
-                Set<Integer> subscribers = channelSubscribers.get(channel);
+                Set<Integer> subscribers = this.channelSubscribers.get(channel);
                 if (subscribers != null) {
                     subscribers.remove(connectionId);
                 }
@@ -76,16 +76,16 @@ public class ConnectionsImpl<T> implements Connections<T> {
         }
 
         // 3. Clean up the reverse mapping
-        clientSubscriptionIdToChannel.remove(connectionId);
+        this.clientSubscriptionIdToChannel.remove(connectionId);
     }
 
     /**
      * Helper: Adds a new client connection.
      */
     public void addConnection(int connectionId, ConnectionHandler<T> handler) {
-        connectionsMap.put(connectionId, handler);
-        clientChannelToSubscriptionId.put(connectionId, new ConcurrentHashMap<>());
-        clientSubscriptionIdToChannel.put(connectionId, new ConcurrentHashMap<>());
+        this.connectionsMap.put(connectionId, handler);
+        this.clientChannelToSubscriptionId.put(connectionId, new ConcurrentHashMap<>());
+        this.clientSubscriptionIdToChannel.put(connectionId, new ConcurrentHashMap<>());
     }
 
     /**
@@ -94,10 +94,10 @@ public class ConnectionsImpl<T> implements Connections<T> {
     public void subscribe(String channel, int connectionId, String subscriptionId) {
         channelSubscribers.computeIfAbsent(channel, k -> ConcurrentHashMap.newKeySet()).add(connectionId);
 
-        clientChannelToSubscriptionId.computeIfAbsent(connectionId, k -> new ConcurrentHashMap<>())
+        this.clientChannelToSubscriptionId.computeIfAbsent(connectionId, k -> new ConcurrentHashMap<>())
                                      .put(channel, subscriptionId);
 
-        clientSubscriptionIdToChannel.computeIfAbsent(connectionId, k -> new ConcurrentHashMap<>())
+        this.clientSubscriptionIdToChannel.computeIfAbsent(connectionId, k -> new ConcurrentHashMap<>())
                                      .put(subscriptionId, channel);
     }
 
@@ -105,18 +105,18 @@ public class ConnectionsImpl<T> implements Connections<T> {
      * Helper: Unsubscribes a user based on Subscription ID.
      */
     public void unsubscribe(String subscriptionId, int connectionId) {
-        ConcurrentMap<String, String> subToChannel = clientSubscriptionIdToChannel.get(connectionId);
+        ConcurrentMap<String, String> subToChannel = this.clientSubscriptionIdToChannel.get(connectionId);
         if (subToChannel == null) return;
         
         String channel = subToChannel.remove(subscriptionId);
         
         if (channel != null) {
-            Set<Integer> subscribers = channelSubscribers.get(channel);
+            Set<Integer> subscribers = this.channelSubscribers.get(channel);
             if (subscribers != null) {
                 subscribers.remove(connectionId);
             }
             
-            ConcurrentMap<String, String> channelToSub = clientChannelToSubscriptionId.get(connectionId);
+            ConcurrentMap<String, String> channelToSub = this.clientChannelToSubscriptionId.get(connectionId);
             if (channelToSub != null) {
                 channelToSub.remove(channel);
             }
@@ -127,14 +127,14 @@ public class ConnectionsImpl<T> implements Connections<T> {
      * Helper: Checks if a user is subscribed to a channel.
      */
     public boolean isUserSubscribed(int connectionId, String channel) {
-        ConcurrentMap<String, String> userChannels = clientChannelToSubscriptionId.get(connectionId);
+        ConcurrentMap<String, String> userChannels = this.clientChannelToSubscriptionId.get(connectionId);
         return userChannels != null && userChannels.containsKey(channel);
     }
 
     /**
      * Helper: Adding subscsription ID to a message
      */
-    public String addSubIdToMessage(String subscriptionId, String msg){
+    private String addSubIdToMessage(String subscriptionId, String msg){
         return msg.replaceFirst("\n", "\nsubscription:" + subscriptionId + "\n");
     }
 }

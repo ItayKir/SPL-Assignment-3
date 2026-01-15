@@ -36,6 +36,6 @@ public interface Connections<T> {
 
     boolean isUserSubscribed(int connectionId, String channel);
 
-    String addSubIdToMessage( String subscriptionId, String msg);
+    //String addSubIdToMessage( String subscriptionId, String msg);
 
 }
