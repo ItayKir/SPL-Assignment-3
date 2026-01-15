@@ -100,7 +100,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             processError(stompFrame, "Empty message", "Can't send an empty message to the topic.");
         
         try{
-            this.connections.send(destination, buildServerMessage(destination, String.valueOf(this.messageCounter.addAndGet(1))));
+            this.connections.send(destination, buildServerMessage(stompFrame, destination, String.valueOf(this.messageCounter.addAndGet(1)), messageBody));
         }
         catch(Exception e){
             processError(stompFrame, "Failed SEND", "Server failed while sending");
@@ -110,6 +110,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     private void processSubscribe(StompFrameParser stompFrame){
         String destination = stompFrame.getHeaderValue("destination");
         String id = stompFrame.getHeaderValue("id");
+        
         this.connections.subscribe(destination, this.connectionId, id);
         
     }
@@ -157,12 +158,13 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
      * @return String represeting MESSAGE
      * @implNote subscription ID is added by Connections (addSubIdToMessage)
      */
-    private String buildServerMessage(String destination, String message_id){
+    private String buildServerMessage(StompFrameParser stompFrame,String destination, String message_id, String msgBody){
         Map<String, String> msgHeaders = new HashMap<String,String>();
         msgHeaders.put("destination",destination);
         msgHeaders.put("message-id",message_id);
+        addReceiptIfExist(stompFrame, msgHeaders);
 
-        return buildResponseMessage("MESSAGE", msgHeaders, null);
+        return buildResponseMessage("MESSAGE", msgHeaders, msgBody);
     }
 
 

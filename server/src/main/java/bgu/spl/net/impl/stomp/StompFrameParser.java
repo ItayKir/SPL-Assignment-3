@@ -45,7 +45,9 @@ public class StompFrameParser {
 
         String stompBody ="";
         while(i < msgLines.length){
-            stompBody += msgLines[i] + "\n";
+            stompBody += msgLines[i];
+            if(i < msgLines.length)
+                stompBody += "\n";
         }
 
         return new StompFrameParser(rawCommand, rawHeaders, stompBody);
