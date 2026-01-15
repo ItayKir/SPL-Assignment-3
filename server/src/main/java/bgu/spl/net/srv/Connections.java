@@ -30,10 +30,12 @@ public interface Connections<T> {
     //Helper Functions
     void addConnection(int connectionId, ConnectionHandler<T> handler);
 
-    void subscribe(String channel, int connectionId);
+    void subscribe(String channel, int connectionId, String subscriptionId);
 
-    void unsubscribe(String channel, int connectionId);
+    void unsubscribe(String subscriptionId, int connectionId);
 
     boolean isUserSubscribed(int connectionId, String channel);
+
+    String addSubIdToMessage( String subscriptionId, String msg);
 
 }

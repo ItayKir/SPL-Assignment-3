@@ -5,113 +5,136 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class ConnectionsImpl<T> implements Connections<T>{
+public class ConnectionsImpl<T> implements Connections<T> {
 
-    //TODO: Need to check if this is enough to support subscribtion ID checking.
+    // ID -> Handler
     private final ConcurrentMap<Integer, ConnectionHandler<T>> connectionsMap = new ConcurrentHashMap<>();
+
+    // Channel -> Connection IDs
     private final ConcurrentMap<String, Set<Integer>> channelSubscribers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Integer, Set<String>> clientsSubscribedChannels = new ConcurrentHashMap<>();
+
+    //  Connection ID -> (Subscription ID -> Channel)
+    private final ConcurrentMap<Integer, ConcurrentMap<String, String>> clientSubscriptionIdToChannel = new ConcurrentHashMap<>();
+
+    //Connection ID -> (Channel Name -> Subscription ID)
+    private final ConcurrentMap<Integer, ConcurrentMap<String, String>> clientChannelToSubscriptionId = new ConcurrentHashMap<>();
 
     @Override
-    public boolean send(int connectionId, T msg){
-        ConnectionHandler<T> connectionHandler = this.connectionsMap.get(connectionId);
-
-        if (connectionHandler == null) {
-            return false; 
+    public boolean send(int connectionId, T msg) {
+        ConnectionHandler<T> handler = connectionsMap.get(connectionId);
+        if (handler == null) {
+            return false;
         }
-
-        connectionHandler.send(msg);
-        return true;        
+        handler.send(msg);
+        return true;
     }
 
     @Override
-    public void send(String channel, T msg){
-        Set<Integer> channelSubs = this.channelSubscribers.get(channel);
-
-        if(channelSubs != null){
-            for(Integer connectionId: channelSubs){
-                send(connectionId, msg);
-            }
-        }
-    }
-
-    @Override
-    public void disconnect(int connectionId){
-        ConnectionHandler<T> removedHandler = this.connectionsMap.remove(connectionId);
-        if(removedHandler != null){
-            try{
-                removedHandler.close();
-            }
-            catch(IOException e){
-                e.printStackTrace();
-            }
-        }
-
-        Set<String> connectionSubscribedChannels = this.clientsSubscribedChannels.remove(connectionId);
-        if(connectionSubscribedChannels != null){
-            for(String channel: connectionSubscribedChannels){
-                Set<Integer> channelSubs = this.channelSubscribers.get(channel);
-                if(channelSubs != null){
-                    channelSubs.remove(connectionId);
+    public void send(String channel, T msg) {
+        // Get all users subscribed to this channel
+        Set<Integer> subscribers = channelSubscribers.get(channel);
+        
+        if (subscribers != null) {
+            for (Integer connId : subscribers) {
+                ConcurrentMap<String, String> channelToSub = clientChannelToSubscriptionId.get(connId);
+                
+                if (channelToSub != null) {
+                    String subscriptionId = channelToSub.get(channel);
+                    
+                    if (subscriptionId != null) {
+                        if (msg instanceof String) {
+                            send(connId, (T) addSubIdToMessage(subscriptionId, (String) msg));
+                        }
+                        else{
+                            send(connId, msg);
+                        }
+                    }
                 }
             }
         }
     }
 
-    // Helper functions:
-    /**
-     * Saves given connection with the handler.
-     * @param connectionId
-     * @param handler
-     */
     @Override
-    public void addConnection(int connectionId, ConnectionHandler<T> handler){
-        this.connectionsMap.put(connectionId, handler);
-        this.clientsSubscribedChannels.put(connectionId, ConcurrentHashMap.newKeySet());
+    public void disconnect(int connectionId) {
+        ConnectionHandler<T> handler = connectionsMap.remove(connectionId);
+        if (handler != null) {
+            try {
+                handler.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        ConcurrentMap<String, String> userChannels = clientChannelToSubscriptionId.remove(connectionId);
+        if (userChannels != null) {
+            for (String channel : userChannels.keySet()) {
+                Set<Integer> subscribers = channelSubscribers.get(channel);
+                if (subscribers != null) {
+                    subscribers.remove(connectionId);
+                }
+            }
+        }
+
+        // 3. Clean up the reverse mapping
+        clientSubscriptionIdToChannel.remove(connectionId);
     }
 
     /**
-     * Make connectionId a subscriber of channel
-     * @param channel
-     * @param connectionId
+     * Helper: Adds a new client connection.
      */
-    @Override
-    public void subscribe(String channel, int connectionId){
-        channelSubscribers.computeIfAbsent(channel, k-> ConcurrentHashMap.newKeySet()).add(connectionId);
-        Set<String> userChannels =this.clientsSubscribedChannels.get(connectionId);
-        if(userChannels != null){
-            userChannels.add(channel);
+    public void addConnection(int connectionId, ConnectionHandler<T> handler) {
+        connectionsMap.put(connectionId, handler);
+        clientChannelToSubscriptionId.put(connectionId, new ConcurrentHashMap<>());
+        clientSubscriptionIdToChannel.put(connectionId, new ConcurrentHashMap<>());
+    }
+
+    /**
+     * Helper: Subscribes a user to a channel with a specific Subscription ID.
+     */
+    public void subscribe(String channel, int connectionId, String subscriptionId) {
+        channelSubscribers.computeIfAbsent(channel, k -> ConcurrentHashMap.newKeySet()).add(connectionId);
+
+        clientChannelToSubscriptionId.computeIfAbsent(connectionId, k -> new ConcurrentHashMap<>())
+                                     .put(channel, subscriptionId);
+
+        clientSubscriptionIdToChannel.computeIfAbsent(connectionId, k -> new ConcurrentHashMap<>())
+                                     .put(subscriptionId, channel);
+    }
+
+    /**
+     * Helper: Unsubscribes a user based on Subscription ID.
+     */
+    public void unsubscribe(String subscriptionId, int connectionId) {
+        ConcurrentMap<String, String> subToChannel = clientSubscriptionIdToChannel.get(connectionId);
+        if (subToChannel == null) return;
+        
+        String channel = subToChannel.remove(subscriptionId);
+        
+        if (channel != null) {
+            Set<Integer> subscribers = channelSubscribers.get(channel);
+            if (subscribers != null) {
+                subscribers.remove(connectionId);
+            }
+            
+            ConcurrentMap<String, String> channelToSub = clientChannelToSubscriptionId.get(connectionId);
+            if (channelToSub != null) {
+                channelToSub.remove(channel);
+            }
         }
     }
 
     /**
-     * Remove connectionId a subscriber of channel
-     * @param channel
-     * @param connectionId
+     * Helper: Checks if a user is subscribed to a channel.
      */
-    @Override
-    public void unsubscribe(String channel, int connectionId){
-        Set<Integer> subs = this.channelSubscribers.get(channel);
-        if(subs != null){
-            subs.remove(connectionId);
-        }
-
-        Set<String> clientChannels = this.clientsSubscribedChannels.get(connectionId);
-        if(clientChannels != null){
-            clientChannels.remove(channel);
-        }
+    public boolean isUserSubscribed(int connectionId, String channel) {
+        ConcurrentMap<String, String> userChannels = clientChannelToSubscriptionId.get(connectionId);
+        return userChannels != null && userChannels.containsKey(channel);
     }
 
     /**
-     * Returns true iff user with connectionId is subscribed to channel. Will return false otherwise, including if connectionid does not exist.
-     * @param connectionId
-     * @param channel
-     * @return
+     * Helper: Adding subscsription ID to a message
      */
-    @Override
-    public boolean isUserSubscribed(int connectionId, String channel){
-        Set<String> userSubscriptions = this.clientsSubscribedChannels.get(connectionId);
-        return userSubscriptions!= null && userSubscriptions.contains(channel);
+    public String addSubIdToMessage(String subscriptionId, String msg){
+        return msg.replaceFirst("\n", "\nsubscription:" + subscriptionId + "\n");
     }
-
 }

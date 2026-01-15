@@ -52,15 +52,6 @@ public class StompFrameParser {
     }
 
     /**
-     * Returns the Receipt value iff Receipt header exist in the frame.
-     * @param frame
-     * @return
-     */
-    public static String getReceiptHeader(StompFrameParser frame){
-        return frame.stompHeaders.get("receipt");
-    }
-
-    /**
      * Checks if the frame has header in its headers.
      * @param header
      * @return true iff header is in stompHeaders map as a key.
