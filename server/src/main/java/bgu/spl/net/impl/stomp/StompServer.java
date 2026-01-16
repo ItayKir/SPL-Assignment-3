@@ -1,5 +1,6 @@
 package bgu.spl.net.impl.stomp;
 
+import bgu.spl.net.api.MessagingProtocol;
 import bgu.spl.net.srv.Server;
 
 public class StompServer {
@@ -7,15 +8,29 @@ public class StompServer {
     public static void main(String[] args) {
         // TODO: implement this
 
-        if(args.length < 2){
-            System.out.println("Need two inputs: port, and either tpc or reactor");
+        if(args.length != 2){
+            System.out.println("Need exactly two inputs: port, and either \"tpc\" or \"reactor\"");
             return;
         }
 
         int port = Integer.parseInt(args[0]);
         String serverType = args[0];
         if(serverType.equals("reactor")){
-            Server.reactor(10, port, () -> new StompMessagingProtocolImpl(), () -> new StompMessageEncoderDecoder());
+            Server.reactor(
+                10, //It was never mentioned how many threads to run this with...
+                port, 
+                () -> (MessagingProtocol<String>) new StompMessagingProtocolImpl(), 
+                () -> new StompMessageEncoderDecoder()
+            ).serve();
+        }
+        else if(serverType.equals("tpc")){
+            Server.threadPerClient(
+                port, 
+                () -> (MessagingProtocol<String>) new StompMessagingProtocolImpl(), 
+                () -> new StompMessageEncoderDecoder()
+            ).serve();
+        } else{
+            System.out.println("Not a supported server type (" + serverType + "). Supported server types are \"tpc\" or \"reactor\".");
         }
     }
 }

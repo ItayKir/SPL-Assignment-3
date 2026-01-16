@@ -1,10 +1,8 @@
 package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
-//import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.MessagingProtocol;
 import bgu.spl.net.api.StompMessagingProtocol;
-import bgu.spl.net.impl.stomp.StompMessageEncoderDecoder;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -45,7 +43,6 @@ private final int port;
                 MessagingProtocol<T> protocol = protocolFactory.get();
                 int connectionId = connectionIdCounter++;
 
-                // [Added] 2. Initialize the STOMP protocol (Inject dependencies)
                 if (protocol instanceof StompMessagingProtocol) {
                     ((StompMessagingProtocol<T>) protocol).start(connectionId, connections);
                 }
@@ -55,7 +52,6 @@ private final int port;
                         encdecFactory.get(),
                         protocol);
                 
-                // [Added] 3. Register the handler in the connections map
                 connections.addConnection(connectionId, handler);
 
                 execute(handler);
