@@ -5,8 +5,9 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <mutex>
 
-StompProtocol::StompProtocol() : subscriptionId(0), receiptId(0), userName(""), isConnected(false), shouldTerminate(false) {
+StompProtocol::StompProtocol() : subscriptionId(0), receiptIdCounter(0), userName(""), isConnected(false), shouldTerminate(false) {
 }
 
 void StompProtocol::setUserName(std::string name) {
@@ -69,15 +70,14 @@ std::string StompProtocol::createSendFrame(std::string destination, std::string 
  * @param destination 
  * @return std::string 
  */
-std::string StompProtocol::createSubscribeFrame(std::string destination) {
+std::string StompProtocol::createSubscribeFrame(std::string destination, int receipt_id) {
     std::map<std::string, std::string> headers;
     headers["destination"] = destination;
     
     int id = addChannel(destination);
     headers["id"] = std::to_string(id);
 
-    headers["receipt"] = std::to_string(receiptId);
-    receiptId++;
+    headers["receipt"] = std::to_string(receipt_id);
     
     return createStompFrame("SUBSCRIBE", headers, "");
 }
@@ -88,14 +88,13 @@ std::string StompProtocol::createSubscribeFrame(std::string destination) {
  * @param destination 
  * @return std::string 
  */
-std::string StompProtocol::createUnsubscribeFrame(std::string destination) {
+std::string StompProtocol::createUnsubscribeFrame(std::string destination, int receipt_id) {
     std::map<std::string, std::string> headers;
     
     int id = getChannelSubId(destination);
     headers["id"] = std::to_string(id);
 
-    headers["receipt"] = std::to_string(receiptId);
-    receiptId++;
+    headers["receipt"] = std::to_string(receipt_id);
 
     return createStompFrame("UNSUBSCRIBE", headers, "");
 }
@@ -108,9 +107,9 @@ std::string StompProtocol::createUnsubscribeFrame(std::string destination) {
 std::string StompProtocol::createDisconnectFrame() {
     std::map<std::string, std::string> headers;
     
-    disconnectId = receiptId;
-    headers["receipt"] = std::to_string(receiptId);
-    receiptId++;
+    disconnectId = receiptIdCounter;
+    headers["receipt"] = std::to_string(receiptIdCounter);
+    receiptIdCounter++;
     
     return createStompFrame("DISCONNECT", headers, "");
 }
@@ -145,7 +144,7 @@ std::string StompProtocol::createStompFrame(std::string command, std::map<std::s
 void StompProtocol::deleteData() {
     topicToSubId.clear();
     subscriptionId = 0;
-    receiptId = 0;
+    receiptIdCounter = 0;
     userName = "";
 }
 
@@ -207,8 +206,13 @@ bool StompProtocol::processServerResponse(std::string frame) {
 
     else if (command == "RECEIPT") {
         if (headers.count("receipt-id")) {
-            std::string recId = headers["receipt-id"];
-            if (this->disconnectId != -1 && recId == std::to_string(this->disconnectId)) {
+            int recId = std::stoi(headers["receipt-id"]);
+            std::lock_guard<std::mutex> lock(receiptMutex);
+            if(receiptCallbacks.count(recId)){
+                std::cout << receiptCallbacks[recId] << std::endl;
+                receiptCallbacks.erase(recId);
+            }
+            if (this->disconnectId != -1 && recId == this->disconnectId) {
                 return true;
             }
         }
@@ -331,3 +335,9 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
     return summaryString;
 }
 
+int StompProtocol::addReceipt(std::string printMessage) {
+    std::lock_guard<std::mutex> lock(receiptMutex);
+    int id = ++receiptIdCounter;
+    receiptCallbacks[id] = printMessage;
+    return id;
+}

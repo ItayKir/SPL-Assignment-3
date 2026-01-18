@@ -5,19 +5,24 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <mutex>
 
 class StompProtocol
 {
 private:
     std::map<std::string, int> topicToSubId;
     int subscriptionId;
-    int receiptId;
+    int receiptIdCounter;
     std::string userName;
     bool isConnected;
     bool shouldTerminate;
     int disconnectId=-1;
+    
     // game_name -> (user_name -> Events)
     std::map<std::string, std::map<std::string, std::vector<Event>>> gameUpdates;
+
+    std::map<int, std::string> receiptCallbacks;
+    std::mutex receiptMutex;
 
 public:
     StompProtocol();
@@ -36,9 +41,9 @@ public:
 
     std::string createSendFrame(std::string destination, std::string frameBody);
 
-    std::string createSubscribeFrame(std::string destination);
+    std::string createSubscribeFrame(std::string destination, int receipt_id);
 
-    std::string createUnsubscribeFrame(std::string destination);
+    std::string createUnsubscribeFrame(std::string destination, int receipt_id);
 
     std::string createDisconnectFrame();
 
@@ -50,5 +55,7 @@ public:
 
     void saveEvent(const Event& event, std::string username);
 
-    void addRowToSummary(std::string& body, std::string rowKey, std::string delimiter="", std::string rowValue = ""); 
+    void addRowToSummary(std::string& body, std::string rowKey, std::string delimiter="", std::string rowValue = "");
+    
+    int addReceipt(std::string printMessage);
 };

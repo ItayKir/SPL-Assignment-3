@@ -60,7 +60,8 @@ void readSocketTask(ConnectionHandler* handler, StompProtocol* protocol, bool* s
 void handleJoin(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 1) {
         std::string channel = args[1];
-        std::string frame = protocol.createSubscribeFrame(channel);
+        int receiptToAdd = protocol.addReceipt("Joined channel " + channel);
+        std::string frame = protocol.createSubscribeFrame(channel, receiptToAdd);
         handler.sendLine(frame);
     } else {
         std::cout << "Usage: join {channel_name}" << std::endl;
@@ -77,7 +78,8 @@ void handleJoin(const std::vector<std::string>& args, StompProtocol& protocol, C
 void handleExit(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 1) {
         std::string channel = args[1];
-        std::string frame = protocol.createUnsubscribeFrame(channel);
+        int receiptToAdd = protocol.addReceipt("Exited channel " + channel);
+        std::string frame = protocol.createUnsubscribeFrame(channel, receiptToAdd);
         handler.sendLine(frame);
     } else {
         std::cout << "Usage: exit {channel_name}" << std::endl;
