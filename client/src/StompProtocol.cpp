@@ -236,10 +236,8 @@ bool StompProtocol::processServerResponse(std::string frame) {
  * @param username 
  */
 void StompProtocol::saveEvent(const Event& event, std::string username) {
-    // Construct the unique game name (Topic)
     std::string gameName = event.get_team_a_name() + "_" + event.get_team_b_name();
     
-    // Store the event
     gameUpdates[gameName][username].push_back(event);
 }
 
@@ -263,20 +261,19 @@ void addRowToSummary(std::string& body, std::string rowKey, std::string rowValue
  * @return std::string 
  */
 std::string StompProtocol::summarizeGame(std::string gameName, std::string user) {
-    // 1. Check if we have data
+    // Check if we have data
     if (gameUpdates.find(gameName) == gameUpdates.end() || 
         gameUpdates[gameName].find(user) == gameUpdates[gameName].end()) {
         std::cout << "No updates found for " << gameName << " from user " << user << std::endl;
         return;
     }
 
-    // 2. Get the user's events (Make a copy so we can sort without messing up the original order if needed)
+    // Get the user events 
     std::vector<Event> events = gameUpdates[gameName][user];
     std::string team_a_name = events[0].get_team_a_name();
     std::string team_b_name = events[0].get_team_b_name();
 
-    // 3. SORT by time (Requirement: "ordered in the order that they happened")
-    // If times are equal, you might want a secondary sort, but time is usually sufficient.
+    // SORT (by half (true/false) then by time) 
     std::sort(events.begin(), events.end(), [](const Event& a, const Event& b) {
         bool a_before = true;
         bool b_before = true;
@@ -293,22 +290,21 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
         return a.get_time() < b.get_time();
     });
 
-    // 4. Aggregate Stats (Requirement: "stats... ordered lexicographically")
-    // std::map automatically sorts keys alphabetically.
     std::map<std::string, std::string> general_stats;
     std::map<std::string, std::string> team_a_stats;
     std::map<std::string, std::string> team_b_stats;
 
     for (const auto& event : events) {
-        // Since we iterate through sorted events, these maps will hold the LATEST value for each key.
-        for (const auto& pair : event.get_game_updates()) general_stats[pair.first] = pair.second;
-        for (const auto& pair : event.get_team_a_updates()) team_a_stats[pair.first] = pair.second;
-        for (const auto& pair : event.get_team_b_updates()) team_b_stats[pair.first] = pair.second;
+        for (const auto& pair : event.get_game_updates()) 
+            general_stats[pair.first] = pair.second;
+        for (const auto& pair : event.get_team_a_updates()) 
+            team_a_stats[pair.first] = pair.second;
+        for (const auto& pair : event.get_team_b_updates()) 
+            team_b_stats[pair.first] = pair.second;
     }
 
     std::string summaryString = "";
 
-    // 5. Print the Report
     addRowToSummary(summaryString, team_a_name + " vs " + team_b_name);
     addRowToSummary(summaryString, "General stats", ":");
 
@@ -327,7 +323,6 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
 
     addRowToSummary(summaryString, "Game event reports", ":");
     for (const auto& event : events) {
-        // Print the short report format (Time - Name: Description)
         addRowToSummary(summaryString, event.get_time() + "-" + event.get_name(), ":");
         addRowToSummary(summaryString, event.get_discription());
     }
