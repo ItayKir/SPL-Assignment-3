@@ -17,7 +17,7 @@ public class StompServer {
         String serverType = args[0];
         if(serverType.equals("reactor")){
             Server.reactor(
-                10, //It was never mentioned how many threads to run this with...
+                Runtime.getRuntime().availableProcessors(), 
                 port, 
                 () -> (MessagingProtocol<String>) new StompMessagingProtocolImpl(), 
                 () -> new StompMessageEncoderDecoder()
