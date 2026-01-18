@@ -74,7 +74,7 @@ def create_file_tracking_table(cursor):
 def execute_sql_command(sql_command: str) -> str:
     try:
         with sqlite3.connect(DB_FILE) as conn:
-            cursor = conn.cursor;
+            cursor = conn.cursor()
             cursor.execute(sql_command)
             conn.commit()
             return "SUCCESS"
@@ -85,7 +85,7 @@ def execute_sql_command(sql_command: str) -> str:
 def execute_sql_query(sql_query: str) -> str:
     try:
         with sqlite3.connect(DB_FILE) as conn:
-            cursor = conn.cursor;
+            cursor = conn.cursor()
             all = cursor.execute(sql_query).fetchall()
             result = ["SUCCESS"]
             for row in all:
@@ -127,6 +127,7 @@ def handle_client(client_socket: socket.socket, addr):
 
 
 def start_server(host="127.0.0.1", port=7778):
+    init_database()
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -135,7 +136,6 @@ def start_server(host="127.0.0.1", port=7778):
         server_socket.listen(5)
         print(f"[{SERVER_NAME}] Server started on {host}:{port}")
         print(f"[{SERVER_NAME}] Waiting for connections...")
-
         while True:
             client_socket, addr = server_socket.accept()
             t = threading.Thread(
