@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <algorithm>
 
 class StompProtocol
 {
@@ -15,6 +16,8 @@ private:
     bool isConnected;
     bool shouldTerminate;
     int disconnectId=-1;
+    // game_name -> (user_name -> Events)
+    std::map<std::string, std::map<std::string, std::vector<Event>>> gameUpdates;
 
 public:
     StompProtocol();
@@ -42,4 +45,10 @@ public:
     std::string createStompFrame(std::string command, std::map<std::string,std::string> headers, std::string body);
 
     bool processServerResponse(std::string frame);
+
+    std::string summarizeGame(std::string gameName, std::string user);
+
+    void saveEvent(const Event& event, std::string username);
+
+    void addRowToSummary(std::string& body, std::string rowKey, std::string delimiter="", std::string rowValue = ""); 
 };

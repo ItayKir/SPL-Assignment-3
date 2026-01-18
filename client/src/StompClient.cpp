@@ -7,9 +7,15 @@
 #include "../include/ConnectionHandler.h"
 #include "../include/StompProtocol.h"
 #include "../include/event.h"
+#include <fstream>
 
-//helper functions
-
+/**
+ * @brief Helper function to split arguments
+ * 
+ * @param str 
+ * @param delimiter 
+ * @return std::vector<std::string> 
+ */
 std::vector<std::string> split(const std::string& str, char delimiter) {
     std::vector<std::string> tokens;
     std::string token;
@@ -20,7 +26,13 @@ std::vector<std::string> split(const std::string& str, char delimiter) {
     return tokens;
 }
 
-//thread task that reads from server
+/**
+ * @brief Thread task that reads from the server and processes 
+ * 
+ * @param handler 
+ * @param protocol 
+ * @param shouldTerminate 
+ */
 void readSocketTask(ConnectionHandler* handler, StompProtocol* protocol, bool* shouldTerminate) {
     while (!*shouldTerminate) {
         std::string answer;
@@ -38,7 +50,13 @@ void readSocketTask(ConnectionHandler* handler, StompProtocol* protocol, bool* s
     }
 }
 
-// every handle command is responsible for handling user input
+/**
+ * @brief Handle join command
+ * 
+ * @param args 
+ * @param protocol 
+ * @param handler 
+ */
 void handleJoin(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 1) {
         std::string channel = args[1];
@@ -49,6 +67,13 @@ void handleJoin(const std::vector<std::string>& args, StompProtocol& protocol, C
     }
 }
 
+/**
+ * @brief Handles exit command
+ * 
+ * @param args 
+ * @param protocol 
+ * @param handler 
+ */
 void handleExit(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 1) {
         std::string channel = args[1];
@@ -59,6 +84,13 @@ void handleExit(const std::vector<std::string>& args, StompProtocol& protocol, C
     }
 }
 
+/**
+ * @brief Handle add command
+ * 
+ * @param args 
+ * @param protocol 
+ * @param handler 
+ */
 void handleAdd(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 2) {
         std::string channel = args[1];
@@ -73,31 +105,97 @@ void handleAdd(const std::vector<std::string>& args, StompProtocol& protocol, Co
     }
 }
 
+/**
+ * @brief Adds a row in the needed format to the report. Sending by refrence to change the body.
+ * 
+ * @param body 
+ * @param rowKey 
+ * @param rowValue 
+ */
+void addRowToReport(std::string& body, std::string rowKey, std::string rowValue) {
+    body += rowKey + ":" + rowValue + "\n";
+}
+
+/**
+ * @brief Handles report command
+ * 
+ * @param args 
+ * @param protocol 
+ * @param handler 
+ */
 void handleReport(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 1) {
         std::string file = args[1];
-        names_and_events data = parseEventsFile(file); // From event.h
+        
+        names_and_events data = parseEventsFile(file); 
+        std::string channel_name = data.team_a_name + "_" + data.team_b_name;
 
         for (const Event& event : data.events) {
-            // Format body per assignment specs
-            std::string body = "user:" + protocol.getUserName() + "\n" +
-                               "city:" + event.get_city() + "\n" +
-                               "event name:" + event.get_name() + "\n" +
-                               "date_time:" + std::to_string(event.get_date_time()) + "\n" +
-                               "general information:\n" +
-                               "active:" + (event.get_general_information().get_active() ? "true" : "false") + "\n" +
-                               "forces_arrival_at_scene:" + (event.get_general_information().get_forces_arrival_at_scene() ? "true" : "false") + "\n" +
-                               "description:" + event.get_description();
+            std::string body = "";
+            
 
-            // Note: Assuming 'some_destination' is replaced by actual logic or channel name
-            handler.sendLine(protocol.createSendFrame("some_destination", body));
+            addRowToReport(body, "user", protocol.getUserName());
+            addRowToReport(body, "team a", data.team_a_name);
+            addRowToReport(body, "team b", data.team_b_name);
+            addRowToReport(body, "event name", event.get_name());
+            addRowToReport(body, "time", std::to_string(event.get_time()));
+            
+            body += "general game updates:\n";
+            for (const auto& pair : event.get_game_updates()) {
+                addRowToReport(body, pair.first, pair.second);
+            }
+
+            body += "team a updates:\n";
+            for (const auto& pair : event.get_team_a_updates()) {
+                addRowToReport(body, pair.first, pair.second);
+            }
+
+            body += "team b updates:\n";
+            for (const auto& pair : event.get_team_b_updates()) {
+                addRowToReport(body, pair.first, pair.second);
+            }
+
+            body += "description:\n";
+            body += event.get_discription();
+            std::string frame = protocol.createSendFrame(channel_name, body);
+            handler.sendLine(frame);
         }
     } else {
         std::cout << "Usage: report {file_path}" << std::endl;
     }
 }
 
-// Returns TRUE if logout was initiated
+/**
+ * @brief Handles summary command
+ * 
+ * @param args 
+ * @param protocol 
+ * @param handler 
+ */
+void handleSummary(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler){
+    if (args.size() > 4){
+        std::string gameSummary = protocol.summarizeGame(args[1], args[2]);
+        std::cout << gameSummary << std::endl;
+
+        std::ofstream outFile(args[3]);
+        if(outFile.is_open()){
+            outFile << gameSummary;
+            outFile.close();
+        }
+    } else{
+        std::cout << "Usage: summary {game_name} {user} {file}" << std::endl;
+    }
+}
+
+
+/**
+ * @brief Handles logout command 
+ * 
+ * @param protocol 
+ * @param handler 
+ * @param socketThread 
+ * @param shouldTerminate 
+ */
 void handleLogout(StompProtocol& protocol, ConnectionHandler& handler, std::thread& socketThread, bool& shouldTerminate) {
     std::string frame = protocol.createDisconnectFrame();
     handler.sendLine(frame);
@@ -114,10 +212,14 @@ void handleLogout(StompProtocol& protocol, ConnectionHandler& handler, std::thre
     std::cout << "Logged out. Ready for new login." << std::endl;
 }
 
-// ---------------------------------------------------------------------------------
-//                                MAIN LOOPS
-// ---------------------------------------------------------------------------------
 
+/**
+ * @brief The main loop, executes the needed function based on user command
+ * 
+ * @param handler 
+ * @param protocol 
+ * @param socketThread 
+ */
 void runCommandLoop(ConnectionHandler& handler, StompProtocol& protocol, std::thread& socketThread) {
     bool shouldTerminate = false;
     const short bufsize = 1024;
@@ -145,6 +247,9 @@ void runCommandLoop(ConnectionHandler& handler, StompProtocol& protocol, std::th
         } 
         else if (cmd == "logout") {
             handleLogout(protocol, handler, socketThread, shouldTerminate);
+        }
+        else if (cmd == "summary") {
+            handleSummary(args, protocol, handler);
         }
         else {
             std::cout << "Unknown command: " << cmd << std::endl;
