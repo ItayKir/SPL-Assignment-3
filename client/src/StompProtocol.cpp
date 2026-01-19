@@ -123,8 +123,7 @@ std::string StompProtocol::createDisconnectFrame() {
  * @return std::string 
  */
 std::string StompProtocol::createStompFrame(std::string command, std::map<std::string, std::string> headers, std::string body) {
-    std::string frame = "";
-    frame += command + "\n";
+    std::string frame = command + "\n";
 
     for (const auto& pair : headers) {
         frame += pair.first + ":" + pair.second + "\n";
@@ -200,6 +199,35 @@ bool StompProtocol::processServerResponse(std::string frame) {
     }
 
     else if (command == "MESSAGE") {
+
+        while (!body.empty() && body.back() == '\0') {
+            body.pop_back();
+        }
+
+        std::stringstream ss(body);
+        std::string line;
+        std::string user = "";
+
+        while(std::getline(ss, line)){
+            if(!line.empty() && line.back() =='\r')
+                line.pop_back();
+
+            if (line.find("user:") == 0) {
+                user = line.substr(5);
+                if (!user.empty() && user.back() == '\r') 
+                    user.pop_back();
+                break;
+            }
+        }
+        Event event(body);
+        
+        // save event
+        if (!user.empty()) {
+            saveEvent(event, user);
+        }
+
+        // print
+        std::cout << "Displaying new event from user: " << user << std::endl;
         std::cout << body << std::endl;
         return false;
     }
@@ -313,12 +341,12 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
         addRowToSummary(summaryString, pair.first, ": ", pair.second);
 
     // team a stats
-    addRowToSummary(summaryString, team_a_name + "stats", ":");
+    addRowToSummary(summaryString, team_a_name + " stats", ":");
     for (const auto& pair : team_a_stats)
         addRowToSummary(summaryString, pair.first, ": ", pair.second);
 
     //team b stats
-    addRowToSummary(summaryString, team_b_name + "stats", ":");
+    addRowToSummary(summaryString, team_b_name + " stats", ":");
     for (const auto& pair : team_b_stats) 
         addRowToSummary(summaryString, pair.first, ": ", pair.second);
 

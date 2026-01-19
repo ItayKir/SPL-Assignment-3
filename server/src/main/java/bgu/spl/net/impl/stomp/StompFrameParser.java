@@ -22,35 +22,42 @@ public class StompFrameParser {
      * @return StompFrameParser
      */
     public static StompFrameParser parse(String rawMessage){
-        String[] msgLines = rawMessage.split("\\R");
-        
-        String rawCommand ="";
-        if(msgLines.length > 0)
-            rawCommand = msgLines[0];
+        try{
+            String[] msgLines = rawMessage.split("\\R");
+            
+            String rawCommand ="";
+            if(msgLines.length > 0)
+                rawCommand = msgLines[0];
 
-        Map<String, String> rawHeaders = new HashMap<String,String>();
-        int i = 1;
-        while( i < msgLines.length && !msgLines[i].isEmpty()){
-            String[] parsedHeader = msgLines[i].split(":", 2);
-            if(parsedHeader.length < 2){
-                rawHeaders.put(parsedHeader[0], null);
+            Map<String, String> rawHeaders = new HashMap<String,String>();
+            int i = 1;
+            while( i < msgLines.length && !msgLines[i].isEmpty()){
+                String[] parsedHeader = msgLines[i].split(":", 2);
+                if(parsedHeader.length < 2){
+                    rawHeaders.put(parsedHeader[0], null);
+                }
+                else{
+                    rawHeaders.put(parsedHeader[0], parsedHeader[1]);
+                }
+                i++;
             }
-            else{
-                rawHeaders.put(parsedHeader[0], parsedHeader[1]);
-            }
+
             i++;
+
+            String stompBody ="";
+            while(i < msgLines.length){
+                stompBody += msgLines[i];
+                i++;
+                if(i < msgLines.length)
+                    stompBody += "\n";
+            }
+            return new StompFrameParser(rawCommand, rawHeaders, stompBody);
         }
-
-        i++;
-
-        String stompBody ="";
-        while(i < msgLines.length){
-            stompBody += msgLines[i];
-            if(i < msgLines.length)
-                stompBody += "\n";
+        catch(Exception e){
+            e.printStackTrace();
+            Map<String, String> rawHeaders = new HashMap<String,String>();
+            return new StompFrameParser("", rawHeaders, "");
         }
-
-        return new StompFrameParser(rawCommand, rawHeaders, stompBody);
 
     }
 

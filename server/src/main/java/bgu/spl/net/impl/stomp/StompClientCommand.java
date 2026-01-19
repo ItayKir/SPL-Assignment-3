@@ -56,6 +56,7 @@ public enum StompClientCommand {
         try {
             return StompClientCommand.valueOf(commandString);
         } catch (IllegalArgumentException | NullPointerException e) {
+            e.printStackTrace();
             return UNKNOWN;
         }
     }

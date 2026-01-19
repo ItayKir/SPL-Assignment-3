@@ -56,7 +56,7 @@ print("[+] Bob is successfully subscribed.")
 
 # 4. Bob sends a message
 msg_frame = (
-    "SENDdd\n"
+    "SEND\n"
     "destination:/topic/germany_spain\n"
     "\n"
     "GOAL!!!\n"
@@ -64,6 +64,12 @@ msg_frame = (
 )
 bob.sendall(msg_frame.encode())
 print("[*] Bob sent a message.")
+
+try:
+    data = bob.recv(1024).decode()
+    print(data)
+except socket.timeout:
+    print("\nFAILURE: Alice received nothing (Timeout).")
 
 # Optional: Bob can check for errors (socket is non-blocking usually, but here we can peek)
 # If the server rejected it, Bob would have data waiting.

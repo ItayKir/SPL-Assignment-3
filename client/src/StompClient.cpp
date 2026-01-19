@@ -36,7 +36,7 @@ std::vector<std::string> split(const std::string& str, char delimiter) {
 void readSocketTask(ConnectionHandler* handler, StompProtocol* protocol, bool* shouldTerminate) {
     while (!*shouldTerminate) {
         std::string answer;
-        if (!handler->getLine(answer)) {
+        if (!handler->getFrameAscii(answer, '\0')) { 
             std::cout << "Disconnected. Exiting socket thread." << std::endl;
             *shouldTerminate = true;
             break;
@@ -62,7 +62,7 @@ void handleJoin(const std::vector<std::string>& args, StompProtocol& protocol, C
         std::string channel = args[1];
         int receiptToAdd = protocol.addReceipt("Joined channel " + channel);
         std::string frame = protocol.createSubscribeFrame(channel, receiptToAdd);
-        handler.sendLine(frame);
+        handler.sendBytes(frame.c_str(), frame.length());
     } else {
         std::cout << "Usage: join {channel_name}" << std::endl;
     }
@@ -80,7 +80,7 @@ void handleExit(const std::vector<std::string>& args, StompProtocol& protocol, C
         std::string channel = args[1];
         int receiptToAdd = protocol.addReceipt("Exited channel " + channel);
         std::string frame = protocol.createUnsubscribeFrame(channel, receiptToAdd);
-        handler.sendLine(frame);
+        handler.sendBytes(frame.c_str(), frame.length());
     } else {
         std::cout << "Usage: exit {channel_name}" << std::endl;
     }
@@ -101,7 +101,7 @@ void handleAdd(const std::vector<std::string>& args, StompProtocol& protocol, Co
             message += args[i] + (i == args.size() - 1 ? "" : " ");
         }
         std::string frame = protocol.createSendFrame(channel, message);
-        handler.sendLine(frame);
+        handler.sendBytes(frame.c_str(), frame.length());
     } else {
         std::cout << "Usage: add {channel_name} {message}" << std::endl;
     }
@@ -160,7 +160,7 @@ void handleReport(const std::vector<std::string>& args, StompProtocol& protocol,
             body += "description:\n";
             body += event.get_discription();
             std::string frame = protocol.createSendFrame(channel_name, body);
-            handler.sendLine(frame);
+            handler.sendBytes(frame.c_str(), frame.length());
         }
     } else {
         std::cout << "Usage: report {file_path}" << std::endl;
@@ -175,7 +175,7 @@ void handleReport(const std::vector<std::string>& args, StompProtocol& protocol,
  * @param handler 
  */
 void handleSummary(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler){
-    if (args.size() > 4){
+    if (args.size() > 3){
         std::string gameSummary = protocol.summarizeGame(args[1], args[2]);
         std::cout << gameSummary << std::endl;
 
@@ -200,7 +200,7 @@ void handleSummary(const std::vector<std::string>& args, StompProtocol& protocol
  */
 void handleLogout(StompProtocol& protocol, ConnectionHandler& handler, std::thread& socketThread, bool& shouldTerminate) {
     std::string frame = protocol.createDisconnectFrame();
-    handler.sendLine(frame);
+    handler.sendBytes(frame.c_str(), frame.length());
 
     // Wait for the server to confirm disconnect (via receipt in readSocketTask)
     if (socketThread.joinable()) {
@@ -293,7 +293,7 @@ int main(int argc, char *argv[]) {
 
             // Send Connect Frame
             std::string loginFrame = protocol.createConnectFrame(host, username, password);
-            if (!handler.sendLine(loginFrame)) {
+            if (!handler.sendBytes(loginFrame.c_str(), loginFrame.length())) {
                 std::cout << "Disconnected before login complete" << std::endl;
                 continue;
             }

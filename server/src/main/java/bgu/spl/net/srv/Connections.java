@@ -6,7 +6,6 @@ public interface Connections<T> {
 
     /**
      * Sends a message T to client represented by the given connectionId (server -> client)
-     * -itay
      * @param connectionId
      * @param msg
      * @return True if message was sent, otherwise false.
@@ -14,14 +13,14 @@ public interface Connections<T> {
     boolean send(int connectionId, T msg);
 
     /**
-     * Sends a message T to clients subscribed to channel (server -> clients in channel). -itay
+     * Sends a message T to clients subscribed to channel (server -> clients in channel).
      * @param channel
      * @param msg
      */
     void send(String channel, T msg);
 
     /**
-     * Removes an active client connectionId from the map. -itayk
+     * Removes an active client connectionId from the map.
      * @param connectionId
      */
     void disconnect(int connectionId);

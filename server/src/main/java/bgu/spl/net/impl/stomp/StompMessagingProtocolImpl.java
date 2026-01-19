@@ -27,34 +27,37 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     @Override
     public String process(String message){
         System.out.println("--------------");
-        System.out.println("[DEBUG] Received:\n" + message);
-        System.out.println("--------------");
-        StompFrameParser stompFrame = StompFrameParser.parse(message);
-
-        StompClientCommand clientCommand = StompClientCommand.validatedStompCommand(stompFrame.getCommand());
-        if(!clientCommand.validate(stompFrame)){
-            processError(stompFrame, "Missing mandatory header","The following header is missing for the given command: " + clientCommand.getMissingHeader(stompFrame));
-            return null;
-        }
-        switch (clientCommand){
-            case CONNECT:
-                processConnect(stompFrame);
-                break;
-            case SEND:
-                processSend(stompFrame);
-                break;
-            case SUBSCRIBE:
-                processSubscribe(stompFrame);
-                break;
-            case UNSUBSCRIBE:
-                processUnsubscribe(stompFrame);
-                break;
-            case DISCONNECT:
-                processDisconnect(stompFrame);
-                break;
-            case UNKNOWN:
-                processError(stompFrame, "Unknown STOMP command provided", "The command \"" + stompFrame.getCommand() + "\" is unknown. Please provide one of the following CONNECT, SEND, SUBSCRIBE, UNSUBSCRIBE, DISCONNECT.");
+        System.out.println("[DEBUG] Received the following message from user: "+ this.connectionId + "\n" + message);
+        try{
+            StompFrameParser stompFrame = StompFrameParser.parse(message);
+            StompClientCommand clientCommand = StompClientCommand.validatedStompCommand(stompFrame.getCommand());
+            if(!clientCommand.validate(stompFrame)){
+                processError(stompFrame, "Missing mandatory header","The following header is missing for the given command: " + clientCommand.getMissingHeader(stompFrame));
                 return null;
+            }
+            switch (clientCommand){
+                case CONNECT:
+                    processConnect(stompFrame);
+                    break;
+                case SEND:
+                    processSend(stompFrame);
+                    break;
+                case SUBSCRIBE:
+                    processSubscribe(stompFrame);
+                    break;
+                case UNSUBSCRIBE:
+                    processUnsubscribe(stompFrame);
+                    break;
+                case DISCONNECT:
+                    processDisconnect(stompFrame);
+                    break;
+                case UNKNOWN:
+                    processError(stompFrame, "Unknown STOMP command provided", "The command \"" + stompFrame.getCommand() + "\" is unknown. Please provide one of the following CONNECT, SEND, SUBSCRIBE, UNSUBSCRIBE, DISCONNECT.");
+                    return null;
+            }
+        } catch(Exception e){
+                e.printStackTrace();
+                processError(null, "Could not process request", "Unkown issue occured: " + e);
         }
         return null;
     }
@@ -62,7 +65,6 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     private void processConnect(StompFrameParser stompFrame){
         String login = stompFrame.getHeaderValue("login");
         String accept_version = stompFrame.getHeaderValue("accept-version").trim();
-        String host = stompFrame.getHeaderValue("host");
         String passcode = stompFrame.getHeaderValue("passcode");
 
         if(accept_version == null || !accept_version.equals("1.2") ){
@@ -150,6 +152,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         String receipt = stompFrame.getHeaderValue("receipt");
         this.connections.send(this.connectionId, buildDisconnectMessage(stompFrame, receipt));
         this.connections.disconnect(connectionId);
+        Database.getInstance().logout(connectionId);
     }
 
     /**
@@ -219,12 +222,13 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
      */
     private void processError(StompFrameParser stompFrame, String errorHeader, String errorBody){
         this.shouldTerminate = true;
-
         Map<String,String> errorHeaders = new HashMap<String,String>();
         errorHeaders.put("message", errorHeader);
         addReceiptIfExist(stompFrame, errorHeaders);
 
         this.connections.send(this.connectionId, buildResponseMessage("ERROR", errorHeaders , errorBody));
+        this.connections.disconnect(connectionId);
+        Database.getInstance().logout(connectionId);
     }
 
     /**

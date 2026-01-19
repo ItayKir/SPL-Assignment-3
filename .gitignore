@@ -99,3 +99,9 @@ data/stomp_server.db
 server/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
 server/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
 data/stomp_server.db
+test/test/summary.txt
+data/stomp_server.db
+client/bin/StompClient.o
+client/bin/StompProtocol.o
+client/bin/StompWCIClient
+client/test_events1_summary.txt
