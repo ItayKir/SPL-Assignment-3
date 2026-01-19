@@ -60,6 +60,10 @@ void readSocketTask(ConnectionHandler* handler, StompProtocol* protocol, bool* s
 void handleJoin(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 1) {
         std::string channel = args[1];
+        if(protocol.getChannelSubId(channel)!=-1){
+            std::cout << "You already joined this channel. Ignoring request." << std::endl;
+            return;
+        }
         int receiptToAdd = protocol.addReceipt("Joined channel " + channel);
         std::string frame = protocol.createSubscribeFrame(channel, receiptToAdd);
         handler.sendBytes(frame.c_str(), frame.length());
@@ -78,6 +82,12 @@ void handleJoin(const std::vector<std::string>& args, StompProtocol& protocol, C
 void handleExit(const std::vector<std::string>& args, StompProtocol& protocol, ConnectionHandler& handler) {
     if (args.size() > 1) {
         std::string channel = args[1];
+
+        if(protocol.getChannelSubId(channel)==-1){
+            std::cout << "You were already not subscribed to this channel. Ignoring request." << std::endl;
+            return;
+        }
+        protocol.removeChannel(channel);
         int receiptToAdd = protocol.addReceipt("Exited channel " + channel);
         std::string frame = protocol.createUnsubscribeFrame(channel, receiptToAdd);
         handler.sendBytes(frame.c_str(), frame.length());
@@ -132,6 +142,7 @@ void handleReport(const std::vector<std::string>& args, StompProtocol& protocol,
         names_and_events data = parseEventsFile(file); 
         std::string channel_name = data.team_a_name + "_" + data.team_b_name;
 
+        bool firstEvent = true;
         for (const Event& event : data.events) {
             std::string body = "";
             
@@ -159,7 +170,15 @@ void handleReport(const std::vector<std::string>& args, StompProtocol& protocol,
 
             body += "description:\n";
             body += event.get_discription();
-            std::string frame = protocol.createSendFrame(channel_name, body);
+
+            // Only uploading to DB file tracking once
+            std::string filePathToUpload = "";
+            if(firstEvent){
+                filePathToUpload = file;
+                firstEvent= false; 
+            }
+
+            std::string frame = protocol.createSendFrame(channel_name, body, filePathToUpload);
             handler.sendBytes(frame.c_str(), frame.length());
         }
     } else {
@@ -299,7 +318,7 @@ int main(int argc, char *argv[]) {
             }
 
             // Start Thread and Enter Command Loop
-            bool shouldTerminate = false;
+            bool shouldTerminate = protocol.isShouldTerminate();
             std::thread socketThread(readSocketTask, &handler, &protocol, &shouldTerminate);
 
             runCommandLoop(handler, protocol, socketThread);

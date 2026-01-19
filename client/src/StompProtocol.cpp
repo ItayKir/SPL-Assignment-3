@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <mutex>
 
-StompProtocol::StompProtocol() :topicToSubId(), subscriptionId(0), receiptIdCounter(0), userName(""), isConnected(false), shouldTerminate(false), gameUpdates(),receiptCallbacks(), receiptMutex() {
+StompProtocol::StompProtocol() :topicToSubId(), subscriptionId(0), receiptIdCounter(0), userName(""), shouldTerminate(false), gameUpdates(),receiptCallbacks(), receiptMutex() {
 }
 
 void StompProtocol::setUserName(std::string name) {
@@ -26,11 +26,26 @@ int StompProtocol::addChannel(std::string channel) {
     return topicToSubId[channel];
 }
 
+/**
+ * @brief Returns the subId of a given channel. -1 if does not exist.
+ * 
+ * @param channel 
+ * @return int 
+ */
 int StompProtocol::getChannelSubId(std::string channel) {
     if (topicToSubId.find(channel) != topicToSubId.end()) {
         return topicToSubId[channel];
     }
     return -1;
+}
+
+/**
+ * @brief Removing the channel from the (Channel, SubId) map
+ * 
+ * @param channel 
+ */
+void StompProtocol::removeChannel(std::string channel){
+    topicToSubId.erase(channel);
 }
 
 /**
@@ -57,10 +72,12 @@ std::string StompProtocol::createConnectFrame(std::string host, std::string user
  * @param frameBody 
  * @return std::string 
  */
-std::string StompProtocol::createSendFrame(std::string destination, std::string frameBody) {
+std::string StompProtocol::createSendFrame(std::string destination, std::string frameBody, std::string filePath) {
     std::map<std::string, std::string> headers;
     headers["destination"] = destination;
-    
+    if(filePath != "")
+        headers["file path"] = filePath;
+
     return createStompFrame("SEND", headers, frameBody);
 }
 
@@ -249,6 +266,8 @@ bool StompProtocol::processServerResponse(std::string frame) {
 
     else if (command == "ERROR") {
         std::cout << "Error received from server: " << body << std::endl;
+        std::cout << "Logging out." << std::endl;
+        shouldTerminate = true;
         return true; 
     }
 
@@ -305,8 +324,8 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
 
     // SORT (by half (true/false) then by time) 
     std::sort(events.begin(), events.end(), [](const Event& a, const Event& b) {
-        bool a_before = true;
-        bool b_before = true;
+        bool a_before = (a.get_time() < 2700);
+        bool b_before = (b.get_time() < 2700);
         if (a.get_game_updates().count("before halftime")) {
             a_before = (a.get_game_updates().at("before halftime") == "true");
         }
@@ -335,6 +354,7 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
 
     
     addRowToSummary(summaryString, team_a_name + " vs " + team_b_name);
+    addRowToSummary(summaryString, "Game stats", ":");
     addRowToSummary(summaryString, "General stats", ":");
 
     for (const auto& pair : general_stats)
@@ -352,7 +372,8 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
 
     addRowToSummary(summaryString, "Game event reports", ":");
     for (const auto& event : events) {
-        addRowToSummary(summaryString, event.get_time() + "-" + event.get_name(), ":");
+        addRowToSummary(summaryString, std::to_string(event.get_time()) + " - " + event.get_name(), ":");
+        addRowToSummary(summaryString, "");
         addRowToSummary(summaryString, event.get_discription());
     }
 

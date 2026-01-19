@@ -15,7 +15,6 @@ private:
     int subscriptionId;
     int receiptIdCounter;
     std::string userName;
-    bool isConnected;
     bool shouldTerminate;
     int disconnectId=-1;
     
@@ -35,12 +34,14 @@ public:
     int addChannel(std::string channel);
 
     int getChannelSubId(std::string channel);
+
+    void removeChannel(std::string channel);
     
     void deleteData();
 
     std::string createConnectFrame(std::string host, std::string username, std::string password);
 
-    std::string createSendFrame(std::string destination, std::string frameBody);
+    std::string createSendFrame(std::string destination, std::string frameBody, std::string filePath ="");
 
     std::string createSubscribeFrame(std::string destination, int receipt_id);
 
@@ -59,4 +60,6 @@ public:
     void addRowToSummary(std::string& body, std::string rowKey, std::string delimiter="", std::string rowValue = "");
     
     int addReceipt(std::string printMessage);
+
+    bool isShouldTerminate(){return shouldTerminate;};
 };

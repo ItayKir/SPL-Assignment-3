@@ -3,6 +3,8 @@ package bgu.spl.net.srv;
 import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.MessagingProtocol;
 
+import bgu.spl.net.impl.stomp.StompMessagingProtocolImpl;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -66,6 +68,9 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 
     public void close() {
         try {
+            if (protocol instanceof StompMessagingProtocolImpl) {
+                ((StompMessagingProtocolImpl) protocol).close();
+            }
             chan.close();
         } catch (IOException ex) {
             ex.printStackTrace();
