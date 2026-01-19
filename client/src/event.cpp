@@ -61,8 +61,77 @@ const std::string &Event::get_discription() const
     return this->description;
 }
 
-Event::Event(const std::string &frame_body) : team_a_name(""), team_b_name(""), name(""), time(0), game_updates(), team_a_updates(), team_b_updates(), description("")
+Event::Event(const std::string & frame_body) : team_a_name(""), team_b_name(""), name(""), 
+                                               time(0), game_updates(), team_a_updates(), 
+                                               team_b_updates(), description("") 
 {
+    std::stringstream ss(frame_body);
+    std::string line;
+
+    std::map<std::string, std::string>* current_map_ptr = nullptr;
+    bool parsing_description = false;
+
+    while(std::getline(ss, line)) {
+        // switch
+        if (line == "general game updates:") {
+            current_map_ptr = &game_updates;
+            parsing_description = false;
+            continue;
+        }
+        else if (line == "team a updates:") {
+            current_map_ptr = &team_a_updates;
+            parsing_description = false;
+            continue;
+        }
+        else if (line == "team b updates:") {
+            current_map_ptr = &team_b_updates;
+            parsing_description = false;
+            continue;
+        }
+        else if (line == "description:") {
+            parsing_description = true;
+            current_map_ptr = nullptr; 
+            continue;
+        }
+
+        // when parsing_description becomes true, it means that same line and next lines are part of the description, so they will be add here and that is it.
+        if (parsing_description) {
+            description += line + "\n";
+            continue;
+        }
+
+        // find colon
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = line.substr(0, colonPos);
+            std::string value = line.substr(colonPos + 1);
+
+            // if we need to save to a map
+            if (current_map_ptr != nullptr) {
+                (*current_map_ptr)[key] = value;
+            } 
+            // Otherwise, we are parsing the main headers (team names, time, event name)
+            else {
+                if (key == "team a") {
+                    team_a_name = value;
+                }
+                else if (key == "team b") {
+                    team_b_name = value;
+                }
+                else if (key == "event name") {
+                    name = value;
+                }
+                else if (key == "time") {
+                    try {
+                        time = std::stoi(value);
+                    } catch (...) {
+                        time = 0; // if missing
+                    }
+                }
+
+            }
+        }
+    }
 }
 
 names_and_events parseEventsFile(std::string json_path)

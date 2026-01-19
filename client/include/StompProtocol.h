@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../include/ConnectionHandler.h"
+#include "../include/event.h"
 #include <string>
 #include <map>
 #include <vector>

@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <mutex>
 
-StompProtocol::StompProtocol() : subscriptionId(0), receiptIdCounter(0), userName(""), isConnected(false), shouldTerminate(false) {
+StompProtocol::StompProtocol() :topicToSubId(), subscriptionId(0), receiptIdCounter(0), userName(""), isConnected(false), shouldTerminate(false), gameUpdates(),receiptCallbacks(), receiptMutex() {
 }
 
 void StompProtocol::setUserName(std::string name) {
@@ -249,7 +249,7 @@ void StompProtocol::saveEvent(const Event& event, std::string username) {
  * @param rowValue 
  * @param delimiter 
  */
-void addRowToSummary(std::string& body, std::string rowKey, std::string rowValue="", std::string delimiter = ""){
+void StompProtocol::addRowToSummary(std::string& body, std::string rowKey, std::string delimiter, std::string rowValue){
     body += rowKey + delimiter + rowValue + "\n";
 }
 
@@ -262,10 +262,12 @@ void addRowToSummary(std::string& body, std::string rowKey, std::string rowValue
  */
 std::string StompProtocol::summarizeGame(std::string gameName, std::string user) {
     // Check if we have data
+    std::string summaryString = "";
     if (gameUpdates.find(gameName) == gameUpdates.end() || 
         gameUpdates[gameName].find(user) == gameUpdates[gameName].end()) {
-        std::cout << "No updates found for " << gameName << " from user " << user << std::endl;
-        return;
+        summaryString += "No updates found for " + gameName + " from user " + user;
+        std::cout << summaryString  << std::endl;
+        return summaryString;
     }
 
     // Get the user events 
@@ -303,8 +305,7 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
             team_b_stats[pair.first] = pair.second;
     }
 
-    std::string summaryString = "";
-
+    
     addRowToSummary(summaryString, team_a_name + " vs " + team_b_name);
     addRowToSummary(summaryString, "General stats", ":");
 
