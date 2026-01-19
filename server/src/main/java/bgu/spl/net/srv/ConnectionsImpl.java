@@ -25,6 +25,9 @@ public class ConnectionsImpl<T> implements Connections<T> {
         if (handler == null) {
             return false;
         }
+        System.out.println("--------------");
+        System.out.println("[DEBUG] Sending:\n" + msg);
+        System.out.println("--------------");
         handler.send(msg);
         return true;
     }

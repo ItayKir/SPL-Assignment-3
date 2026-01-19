@@ -26,6 +26,9 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     
     @Override
     public String process(String message){
+        System.out.println("--------------");
+        System.out.println("[DEBUG] Received:\n" + message);
+        System.out.println("--------------");
         StompFrameParser stompFrame = StompFrameParser.parse(message);
 
         StompClientCommand clientCommand = StompClientCommand.validatedStompCommand(stompFrame.getCommand());
@@ -58,12 +61,12 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
 
     private void processConnect(StompFrameParser stompFrame){
         String login = stompFrame.getHeaderValue("login");
-        String accept_version = stompFrame.getHeaderValue("accept-version");
+        String accept_version = stompFrame.getHeaderValue("accept-version").trim();
         String host = stompFrame.getHeaderValue("host");
         String passcode = stompFrame.getHeaderValue("passcode");
 
-        if(accept_version != null && accept_version !="1.2" ){
-            processError(stompFrame, "Incorrect STOMP version", "accept-version must be 1.2");
+        if(accept_version == null || !accept_version.equals("1.2") ){
+            processError(stompFrame, "Incorrect STOMP version", "accept-version must be 1.2.");
             return;
         }
         try{
@@ -92,6 +95,9 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     }
 
     private void processSend(StompFrameParser stompFrame){
+        System.out.println("--------------");
+        System.out.println("[DEBUG] Inside processSend()");
+        System.out.println("--------------");
         String destination = stompFrame.getHeaderValue("destination");
         if(!this.connections.isUserSubscribed(this.connectionId, destination))
             processError(stompFrame, "Not subscibed to topic", "Must be subscribed to the topic in order to send it a message!");
@@ -103,6 +109,12 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         
         try{
             this.connections.send(destination, buildServerMessage(stompFrame, destination, String.valueOf(this.messageCounter.addAndGet(1)), messageBody));
+
+            if(stompFrame.hasHeader("receipt")) {
+                        Map<String, String> msgHeaders = new HashMap<>();
+                        addReceiptIfExist(stompFrame, msgHeaders);
+                        connections.send(connectionId, buildResponseMessage("RECEIPT", msgHeaders, null));
+            }
         }
         catch(Exception e){
             processError(stompFrame, "Failed SEND", "Server failed while sending");
@@ -115,11 +127,23 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         
         this.connections.subscribe(destination, this.connectionId, id);
         
+        if(stompFrame.hasHeader("receipt")) {
+            Map<String, String> msgHeaders = new HashMap<>();
+            addReceiptIfExist(stompFrame, msgHeaders);
+            connections.send(connectionId, buildReceiptMessage(stompFrame));
+        }        
+        
     }
 
     private void processUnsubscribe(StompFrameParser stompFrame){
         String id = stompFrame.getHeaderValue("id");
         this.connections.unsubscribe(id, this.connectionId);
+
+        if(stompFrame.hasHeader("receipt")) {
+            Map<String, String> headers = new HashMap<>();
+            addReceiptIfExist(stompFrame, headers);
+            connections.send(connectionId, buildReceiptMessage(stompFrame));
+        }
     }
 
     private void processDisconnect(StompFrameParser stompFrame){
@@ -136,7 +160,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     private String buildDisconnectMessage(StompFrameParser stompFrame,String receipt){
         Map<String, String> msgHeaders = new HashMap<String,String>();
         addReceiptIfExist(stompFrame, msgHeaders);
-        return buildResponseMessage("RECEIPT", msgHeaders, null);
+        return buildReceiptMessage(stompFrame);//buildResponseMessage("RECEIPT", msgHeaders, null);
     }
 
     /**
@@ -169,6 +193,12 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
         return buildResponseMessage("MESSAGE", msgHeaders, msgBody);
     }
 
+    private String buildReceiptMessage(StompFrameParser stompFrame){
+        Map<String, String> msgHeaders = new HashMap<String,String>();
+        addReceiptIfExist(stompFrame, msgHeaders);
+        return buildResponseMessage("RECEIPT", msgHeaders, null);
+    }
+
 
     /**
      * Builds a general message based on input.
@@ -178,7 +208,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
      * @return String representing a general message to send
      */
     private String buildResponseMessage(String msgCommand, Map<String, String> msgHeaders, String msgBody){
-        return new StompFrameParser(msgCommand, msgHeaders, null).toString();
+        return new StompFrameParser(msgCommand, msgHeaders, msgBody).toString();
     }
 
     /**
@@ -204,7 +234,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
      */
     private void addReceiptIfExist(StompFrameParser stompFrame, Map<String,String> responseHeaders){
         if(stompFrame != null && stompFrame.hasHeader("receipt")){
-            responseHeaders.put("receipt", stompFrame.getHeaderValue("receipt"));
+            responseHeaders.put("receipt-id", stompFrame.getHeaderValue("receipt"));
         }
     }
 
