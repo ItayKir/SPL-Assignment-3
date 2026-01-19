@@ -14,7 +14,7 @@ public class StompServer {
         }
 
         int port = Integer.parseInt(args[0]);
-        String serverType = args[0];
+        String serverType = args[1];
         if(serverType.equals("reactor")){
             Server.reactor(
                 Runtime.getRuntime().availableProcessors(), 
