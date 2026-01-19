@@ -1,6 +1,7 @@
 package bgu.spl.net.impl.stomp;
 
 import bgu.spl.net.api.MessagingProtocol;
+import bgu.spl.net.impl.data.Database;
 import bgu.spl.net.srv.Server;
 
 public class StompServer {
@@ -32,5 +33,6 @@ public class StompServer {
         } else{
             System.out.println("Not a supported server type (" + serverType + "). Supported server types are \"tpc\" or \"reactor\".");
         }
+        Database.getInstance().printReport();
     }
 }

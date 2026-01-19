@@ -31,20 +31,19 @@ std::vector<std::string> split(const std::string& str, char delimiter) {
  * 
  * @param handler 
  * @param protocol 
- * @param shouldTerminate 
  */
-void readSocketTask(ConnectionHandler* handler, StompProtocol* protocol, bool* shouldTerminate) {
-    while (!*shouldTerminate) {
+void readSocketTask(ConnectionHandler* handler, StompProtocol* protocol) {
+    while (!protocol->isShouldTerminate()) {
         std::string answer;
         if (!handler->getFrameAscii(answer, '\0')) { 
             std::cout << "Disconnected. Exiting socket thread." << std::endl;
-            *shouldTerminate = true;
+            protocol->terminateConnection();
             break;
         }
 
         bool closeConnection = protocol->processServerResponse(answer);
         if (closeConnection) {
-            *shouldTerminate = true;
+            protocol->terminateConnection();
             break;
         }
     }
@@ -215,9 +214,8 @@ void handleSummary(const std::vector<std::string>& args, StompProtocol& protocol
  * @param protocol 
  * @param handler 
  * @param socketThread 
- * @param shouldTerminate 
  */
-void handleLogout(StompProtocol& protocol, ConnectionHandler& handler, std::thread& socketThread, bool& shouldTerminate) {
+void handleLogout(StompProtocol& protocol, ConnectionHandler& handler, std::thread& socketThread) {
     std::string frame = protocol.createDisconnectFrame();
     handler.sendBytes(frame.c_str(), frame.length());
 
@@ -225,7 +223,7 @@ void handleLogout(StompProtocol& protocol, ConnectionHandler& handler, std::thre
     if (socketThread.joinable()) {
         socketThread.join();
     }
-    shouldTerminate = true; 
+    protocol.terminateConnection(); 
     
     // Cleanup
     handler.close();
@@ -242,13 +240,18 @@ void handleLogout(StompProtocol& protocol, ConnectionHandler& handler, std::thre
  * @param socketThread 
  */
 void runCommandLoop(ConnectionHandler& handler, StompProtocol& protocol, std::thread& socketThread) {
-    bool shouldTerminate = false;
     const short bufsize = 1024;
     char buf[bufsize];
 
-    while (!shouldTerminate) {
+    while (!protocol.isShouldTerminate()) {
         std::cin.getline(buf, bufsize);
         std::string line(buf);
+
+        if (protocol.isShouldTerminate()) { //if flag changed while waiting for input
+            std::cout << "The connection was terminated before processing. Please login again."<<std::endl;
+            break; 
+        }
+
         std::vector<std::string> args = split(line, ' ');
 
         if (args.empty()) continue;
@@ -267,7 +270,7 @@ void runCommandLoop(ConnectionHandler& handler, StompProtocol& protocol, std::th
             handleReport(args, protocol, handler);
         } 
         else if (cmd == "logout") {
-            handleLogout(protocol, handler, socketThread, shouldTerminate);
+            handleLogout(protocol, handler, socketThread);
         }
         else if (cmd == "summary") {
             handleSummary(args, protocol, handler);
@@ -318,10 +321,13 @@ int main(int argc, char *argv[]) {
             }
 
             // Start Thread and Enter Command Loop
-            bool shouldTerminate = protocol.isShouldTerminate();
-            std::thread socketThread(readSocketTask, &handler, &protocol, &shouldTerminate);
+            std::thread socketThread(readSocketTask, &handler, &protocol);
 
             runCommandLoop(handler, protocol, socketThread);
+
+            if (socketThread.joinable()){
+                socketThread.join();
+            }
         } else {
             std::cout << "Please login first." << std::endl;
         }

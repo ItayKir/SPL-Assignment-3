@@ -266,14 +266,12 @@ bool StompProtocol::processServerResponse(std::string frame) {
 
     else if (command == "ERROR") {
         std::cout << "Error received from server: " << body << std::endl;
-        std::cout << "Logging out." << std::endl;
-        shouldTerminate = true;
+        terminateConnection();
         return true; 
     }
 
     return false;
 }
-
 
 
 /**
@@ -373,8 +371,9 @@ std::string StompProtocol::summarizeGame(std::string gameName, std::string user)
     addRowToSummary(summaryString, "Game event reports", ":");
     for (const auto& event : events) {
         addRowToSummary(summaryString, std::to_string(event.get_time()) + " - " + event.get_name(), ":");
-        addRowToSummary(summaryString, "");
+        summaryString += "\n";
         addRowToSummary(summaryString, event.get_discription());
+        summaryString += "\n";
     }
 
     return summaryString;

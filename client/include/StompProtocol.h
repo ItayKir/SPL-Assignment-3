@@ -62,4 +62,6 @@ public:
     int addReceipt(std::string printMessage);
 
     bool isShouldTerminate(){return shouldTerminate;};
+
+    void terminateConnection(){shouldTerminate = true;};
 };
