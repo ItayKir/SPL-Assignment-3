@@ -19,14 +19,14 @@ public class StompServer {
             Server.reactor(
                 Runtime.getRuntime().availableProcessors(), 
                 port, 
-                () -> (MessagingProtocol<String>) new StompMessagingProtocolImpl(), 
+                () -> new StompMessagingProtocolImpl(), 
                 () -> new StompMessageEncoderDecoder()
             ).serve();
         }
         else if(serverType.equals("tpc")){
             Server.threadPerClient(
                 port, 
-                () -> (MessagingProtocol<String>) new StompMessagingProtocolImpl(), 
+                () -> new StompMessagingProtocolImpl(), 
                 () -> new StompMessageEncoderDecoder()
             ).serve();
         } else{

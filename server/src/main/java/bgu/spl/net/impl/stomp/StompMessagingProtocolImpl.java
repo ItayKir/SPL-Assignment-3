@@ -25,12 +25,13 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     }
     
     @Override
-    public void process(String message){
+    public String process(String message){
         StompFrameParser stompFrame = StompFrameParser.parse(message);
 
         StompClientCommand clientCommand = StompClientCommand.validatedStompCommand(stompFrame.getCommand());
         if(!clientCommand.validate(stompFrame)){
             processError(stompFrame, "Missing mandatory header","The following header is missing for the given command: " + clientCommand.getMissingHeader(stompFrame));
+            return null;
         }
         switch (clientCommand){
             case CONNECT:
@@ -50,8 +51,9 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
                 break;
             case UNKNOWN:
                 processError(stompFrame, "Unknown STOMP command provided", "The command \"" + stompFrame.getCommand() + "\" is unknown. Please provide one of the following CONNECT, SEND, SUBSCRIBE, UNSUBSCRIBE, DISCONNECT.");
-                return;
+                return null;
         }
+        return null;
     }
 
     private void processConnect(StompFrameParser stompFrame){
